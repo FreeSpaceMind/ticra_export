@@ -24,23 +24,31 @@ from .tor import serialize_value
 
 
 class Command:
-    """A single COMMAND OBJECT statement."""
+    """A single COMMAND OBJECT statement.
+
+    ``label`` is the optional trailing command label written after the
+    closing parenthesis (CHAMP job files label commands this way, e.g.
+    ``... ) axial_get_field``).
+    """
 
     def __init__(self, target_name: str, command_name: str,
-                 members: Mapping[str, Any] | None = None):
+                 members: Mapping[str, Any] | None = None,
+                 label: str | None = None):
         self.target_name = str(target_name)
         self.command_name = str(command_name)
         self.members: "OrderedDict[str, Any]" = OrderedDict(members or {})
+        self.label = label
 
     def to_text(self) -> str:
         header = f"COMMAND OBJECT {self.target_name} {self.command_name}"
+        suffix = f" {self.label}" if self.label else ""
         parts = [f"{k} : {serialize_value(v)}" for k, v in self.members.items()]
         if not parts:
-            return f"{header} ()"
+            return f"{header} (){suffix}"
 
         lines = []
         for i, part in enumerate(parts):
-            terminator = "," if i < len(parts) - 1 else ")"
+            terminator = f"){suffix}" if i == len(parts) - 1 else ","
             prefix = f"{header} ( " if i == 0 else "  "
             lines.append(f"{prefix}{part}{terminator}")
         return " &\n".join(lines)

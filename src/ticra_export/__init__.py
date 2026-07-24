@@ -13,9 +13,10 @@ from .tci import Command, TciFile
 from .datafiles import write_gxp, write_rim_file
 from .project import GraspProject, build_dual_reflector_project
 from . import objects
+from . import champ
 
 __all__ = [
     "Comment", "Quantity", "Ref", "Sequence", "Struct", "TorFile",
     "TorObject", "Command", "TciFile", "write_gxp", "write_rim_file",
-    "GraspProject", "build_dual_reflector_project", "objects",
+    "GraspProject", "build_dual_reflector_project", "objects", "champ",
 ]
