@@ -93,7 +93,8 @@ def build_dual_reflector_project(
         struts: Seq[tuple] = (),
         bors: Seq[tuple] = (),
         offset_parabolas: Seq[tuple] = (),
-        mesh_tables: Seq[tuple] = ()) -> GraspProject:
+        mesh_tables: Seq[tuple] = (),
+        auto_convergence: bool = True) -> GraspProject:
     """Assemble the UAD first-case export: dual reflector, tabulated
     surfaces and feed, PO analysis of sub then main, spherical cut out.
 
@@ -142,6 +143,12 @@ def build_dual_reflector_project(
             0-based node indices (4 for flat quads, 9 for curved
             quadratic patches, 3 for triangles written as degenerate
             quads).
+        auto_convergence: When True (default), the get_currents
+            commands request automatic convergence of the PO/PTD
+            expansion (``auto_convergence_of_po : on``) with the
+            convergence field checked on the next scatterer for the
+            subreflector and on the far-field cut for the main
+            reflector, so GRASP chooses the po_points itself.
 
     Returns:
         A GraspProject ready for .write().
@@ -286,10 +293,25 @@ def build_dual_reflector_project(
     # General practice: get_field with a single source, then add_field
     # for each remaining contribution (sub spillover and the direct
     # feed radiation).
-    proj.tci.add(Command("po_sub", "get_currents",
-                         [("source", Sequence([Ref("feed")]))]))
-    proj.tci.add(Command("po_main", "get_currents",
-                         [("source", Sequence([Ref("po_sub")]))]))
+    #
+    # With auto_convergence, each get_currents carries
+    # ``auto_convergence_of_po : on`` plus a convergence target -- the
+    # next scatterer for the sub, the output cut for the main --
+    # following the standard GRASP PO-wizard batch commands.
+    sub_members = [("source", Sequence([Ref("feed")]))]
+    main_members = [("source", Sequence([Ref("po_sub")]))]
+    if auto_convergence:
+        sub_members += [
+            ("auto_convergence_of_po", True),
+            ("convergence_on_scatterer", Sequence([Ref("po_main")])),
+        ]
+        main_members += [
+            ("auto_convergence_of_po", True),
+            ("convergence_on_output_grid",
+             Sequence([Ref("far_field_cut")])),
+        ]
+    proj.tci.add(Command("po_sub", "get_currents", sub_members))
+    proj.tci.add(Command("po_main", "get_currents", main_members))
     proj.tci.add(Command("far_field_cut", "get_field",
                          [("source", Sequence([Ref("po_main")]))]))
     proj.tci.add(Command("far_field_cut", "add_field",

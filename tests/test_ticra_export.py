@@ -351,6 +351,12 @@ def test_build_dual_reflector_project(tmp_path):
     assert "get_field ( source : sequence(ref(po_main)))" in tci_text
     assert "add_field ( source : sequence(ref(po_sub)))" in tci_text
     assert "add_field ( source : sequence(ref(feed)))" in tci_text
+    # Automatic PO convergence is requested by default, checked on the
+    # next scatterer for the sub and on the output cut for the main
+    assert tci_text.count("auto_convergence_of_po : on") == 2
+    assert "convergence_on_scatterer : sequence(ref(po_main))" in tci_text
+    assert ("convergence_on_output_grid : sequence(ref(far_field_cut))"
+            in tci_text)
 
 
 def test_reflector_holes_member():
@@ -402,3 +408,21 @@ def test_project_write_refuses_overwrite(tmp_path):
     proj.write(tmp_path)
     with pytest.raises(FileExistsError):
         proj.write(tmp_path)
+
+
+def test_auto_convergence_can_be_disabled(tmp_path):
+    import numpy as np
+
+    theta = np.linspace(0, 2 * np.pi, 12, endpoint=False)
+    rim = np.column_stack([np.cos(theta), np.sin(theta)])
+    cut = tmp_path / "feed.cut"
+    cut.write_text("dummy\n")
+    sfc_main = tmp_path / "main.sfc"
+    sfc_main.write_text("dummy\n")
+    sfc_sub = tmp_path / "sub.sfc"
+    sfc_sub.write_text("dummy\n")
+
+    proj = build_dual_reflector_project(
+        "noconv", [10.0e9], cut, 4, sfc_main, sfc_sub, rim, 0.5 * rim,
+        rim_dir=tmp_path, auto_convergence=False)
+    assert "auto_convergence_of_po" not in str(proj.tci)
