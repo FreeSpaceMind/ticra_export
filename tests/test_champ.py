@@ -178,3 +178,100 @@ def test_unsupported_section_type_raises():
         build_champ_horn_project(
             "bad", [10e9], sections=[object()],
             throat_radius_m=0.01, aperture_radius_m=0.02)
+
+
+# --- general BoR waveguide device path --------------------------------------
+
+def _stepped_profile():
+    """Stepped corrugated-like interior: throat, slot, aperture."""
+    return [
+        (0.000, 0.015),
+        (0.030, 0.015),   # input guide
+        (0.030, 0.028),   # slot left wall (radius step: sections cannot)
+        (0.034, 0.028),   # slot bottom
+        (0.034, 0.020),   # slot right wall
+        (0.040, 0.020),   # tooth
+        (0.040, 0.045),   # aperture rim step
+    ]
+
+
+def test_bor_profile_layout():
+    text = str(champ.bor_profile("prof", [(0.0, 0.015), (0.03, 0.02)]))
+    assert "prof  piecewise_linear_bor" in text
+    assert "length_unit      : m" in text
+    assert "nodes            : table" in text
+    assert "0.0  0.015" in text
+    assert "0.03  0.02" in text
+
+
+def test_general_bor_waveguide_device_layout():
+    text = str(champ.general_bor_waveguide_device(
+        "dev", "frequency", "prof",
+        [("throat", 0.0, "z"), ("aperture", 0.04, "-z")], "mom"))
+    assert "dev  general_bor_waveguide_device" in text
+    assert "waveguide_geometry : ref(prof)" in text
+    assert ("struct(port: ref(throat), z_position: 0.0 m, "
+            "inward_normal: z)") in text
+    assert ("struct(port: ref(aperture), z_position: 0.04 m, "
+            "inward_normal: -z)") in text
+    assert "analysis_settings : ref(mom)" in text
+
+
+def test_aperture_z_displacement_and_swe():
+    text = str(champ.circular_symmetric_aperture(
+        "ap", "frequency", "port", "ext", "mom", z_displacement_m=0.04))
+    assert "z_displacement   : 0.04 m" in text
+    # member order: exterior before z_displacement before settings
+    assert text.index("exterior") < text.index("z_displacement") \
+        < text.index("analysis_settings")
+
+    swe_text = str(champ.swe_output("swe", "horn.sph"))
+    assert "swe  swe" in swe_text
+    assert "file_name        : horn.sph" in swe_text
+    assert "sphere_sample    : struct(n_phi: 24, n_theta: 360)" in swe_text
+
+
+def test_champ_bor_horn_objects_resolve():
+    from ticra_export.tor import TorFile
+    from ticra_export import objects as obj
+
+    profile = _stepped_profile()
+    tor = TorFile()
+    tor.add(obj.frequency("frequency", [10.0e9]))
+    horn = champ.champ_bor_horn_objects(
+        "h", "frequency", profile,
+        throat_radius_m=0.015, aperture_radius_m=0.045,
+        aperture_z_m=0.040,
+        exterior_z_rho_m=champ.default_bor_exterior(profile, 0.002))
+    for o in horn["objects"]:
+        tor.add(o)
+    assert tor.validate_refs() == []
+    assert horn["aperture_port"] == "h_aperture_port"
+
+
+def test_build_champ_bor_horn_project(tmp_path):
+    proj = champ.build_champ_bor_horn_project(
+        "bor_horn", np.linspace(8e9, 15e9, 8), _stepped_profile(),
+        swe_file="bor_horn.sph")
+    base = proj.write(tmp_path)
+
+    tor_text = (base / "working" / "bor_horn.tor").read_text()
+    assert "general_bor_waveguide_device" in tor_text
+    assert tor_text.count("piecewise_linear_bor") >= 2  # interior + exterior
+    assert "z_displacement" in tor_text
+    assert "combined_horn_section" not in tor_text
+    assert "horn_swe  swe" in tor_text
+    # ports inferred from profile end points
+    assert "radius           : 0.015 m" in tor_text
+    assert "radius           : 0.045 m" in tor_text
+
+    tci_text = (base / "working" / "bor_horn.tci").read_text()
+    assert "export_reflection_coefficient" in tci_text
+    assert "get_field" in tci_text
+
+
+def test_default_bor_exterior_shape():
+    ext = champ.default_bor_exterior(_stepped_profile(), 0.001)
+    assert ext[0] == (0.040, 0.045)            # aperture rim
+    assert ext[1][1] == pytest.approx(0.046)   # outer radius
+    assert ext[-1] == (0.0, 0.015)             # throat rim

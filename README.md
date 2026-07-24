@@ -72,6 +72,55 @@ Lower-level building blocks (`TorFile`, `TorObject`, `TciFile`,
 `Command`, `GraspProject`, `ticra_export.objects`) are available for
 assembling other configurations.
 
+## Usage: CHAMP horn projects
+
+`ticra_export.champ` writes standalone TICRA Tools CHAMP projects that
+analyze a circularly symmetric horn (BoR MoM interior + exterior
+aperture + TE11-excited radiating device + spherical cut, reflection
+export, and beam-parameter commands).
+
+**Preferred path — general BoR waveguide device.** The horn interior is
+a single `piecewise_linear_bor` (z, rho) wall polyline analyzed by a
+`general_bor_waveguide_device` with circular waveguide ports pinned at
+the throat (inward normal `z`) and aperture (inward normal `-z`)
+planes. The polyline may contain radius steps, grooves, angled slots,
+and re-entrant segments, so **any** BoR feed geometry is representable
+(corrugated, ring-loaded, axially corrugated, scalar, smooth-walled):
+
+```python
+from ticra_export.champ import build_champ_bor_horn_project
+
+profile = [  # interior wall, throat rim -> aperture rim, meters
+    (0.000, 0.015),
+    (0.030, 0.015),   # input guide
+    (0.030, 0.028),   # slot wall (radius step)
+    (0.034, 0.028),   # slot bottom
+    (0.034, 0.020),
+    (0.040, 0.020),
+    (0.040, 0.045),   # aperture rim
+]
+project = build_champ_bor_horn_project(
+    "my_horn", frequencies_hz=[10e9, 11e9, 12e9],
+    profile_z_rho_m=profile, swe_file="my_horn.sph")
+project.write("/path/to/output")
+```
+
+Port radii and plane positions default to the profile end points; the
+exterior outer wall defaults to a simple shell
+(`default_bor_exterior`) and can be passed explicitly as a second
+(z, rho) polyline in the same global coordinates. Uniformly spaced
+frequency lists become a `frequency_range` object, others a
+`frequency` list. Use `champ_bor_horn_objects` to embed the same
+device chain inside an existing `.tor` (e.g. next to a GRASP
+reflector system).
+
+**Legacy path — horn section chains.** `build_champ_horn_project`
+chains `circular_waveguide_section` / `simple_axial_corrugated_section`
+objects through a `combined_horn_section` into a mode-matching
+`circular_symmetric_horn`. `combined_horn_section` rejects radius
+steps between consecutive sections, so stepped staircase geometries do
+not load — keep this path only for radius-continuous section chains.
+
 ## Usage: shapes to tabulated meshes
 
 ```python
@@ -120,7 +169,15 @@ TicraUtilities.jl test data, and a TICRA Tools 25.0 project:
   `irregular_xy_grid_triangulation` (struct-valued `file_xyz_number`),
   `circular_struts`, `piecewise_linear_bor`, `scatterer_cluster`, `mom`
 - `.tci` command syntax (`COMMAND OBJECT ... get_currents/get_field/
-  add_field`, `&` continuations, `QUIT` terminator, no command numbering)
+  add_field`, `&` continuations, optional trailing command labels,
+  `QUIT` terminator, no command numbering)
+- CHAMP object classes and member layouts against two TICRA Tools 25.0
+  CHAMP projects: an axially corrugated horn (section-chain path,
+  guppy.tor) and a scalar horn with angled slots (general BoR
+  waveguide device path, scalar_horn_tt.tor) — including
+  `general_bor_waveguide_device` port structs, `piecewise_linear_bor`
+  with `length_unit`, `circular_symmetric_aperture` with
+  `z_displacement`, and the `swe` output object
 - `.rim` file format (header line, count line, x/y pairs)
 - `.gxp` project wrapper (accepted by TICRA Tools 25.0)
 
@@ -147,9 +204,9 @@ system should be placed at the feed phase center (the SWE origin).
 
 ## Roadmap
 
-- CHAMP project export (feed/horn designs as BoR objects) for use with
-  the `antenna_feeds` package
 - Verification of curved-patch and degenerate-quad serializations
+- Native CHAMP ring-loaded/dielectric section classes (the BoR profile
+  path already covers ring-loaded geometry as a re-entrant polyline)
 
 ## Tests
 
