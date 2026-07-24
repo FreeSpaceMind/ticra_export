@@ -87,7 +87,9 @@ def build_dual_reflector_project(
         feed_origin_m: tuple[float, float, float] = (0.0, 0.0, 0.0),
         main_origin_m: tuple[float, float, float] = (0.0, 0.0, 0.0),
         sub_origin_m: tuple[float, float, float] = (0.0, 0.0, 0.0),
-        cut_theta_np: int = 721,
+        cut_theta_np: int = 401,
+        cut_theta_max_deg: float | None = None,
+        cut_sidelobes: float = 5.0,
         rim_dir=None,
         main_hole_rims_xy: Seq[tuple[str, Seq[Seq[float]]]] = (),
         struts: Seq[tuple] = (),
@@ -154,6 +156,12 @@ def build_dual_reflector_project(
             Tools 25 job (X5_long_horn .tci).
         field_accuracy_db: Convergence accuracy for the automatic PO
             convergence, in dB (default -60.0).
+        cut_theta_max_deg: Half-range of the far-field cut in degrees
+            (theta spans -max..+max with ``cut_theta_np`` points,
+            default 401). When None (default) it is sized to capture
+            about ``cut_sidelobes`` sidelobes at the lowest analysis
+            frequency: (cut_sidelobes + 2) * lambda / D_main, using the
+            main rim's largest extent as D.
 
     Returns:
         A GraspProject ready for .write().
@@ -290,8 +298,20 @@ def build_dual_reflector_project(
                                          "main_reflector"))
 
     # --- output ---------------------------------------------------------
+    if cut_theta_max_deg is None:
+        xs = [float(p[0]) for p in main_rim_points_xy]
+        ys = [float(p[1]) for p in main_rim_points_xy]
+        d_main = max(max(xs) - min(xs), max(ys) - min(ys))
+        lam_max = 299792458.0 / min(freq_list)
+        cut_theta_max_deg = min(
+            180.0,
+            math.degrees((float(cut_sidelobes) + 2.0) * lam_max / d_main))
+        # Tidy value for the .tor file
+        cut_theta_max_deg = round(cut_theta_max_deg, 2)
     tor.add(obj.spherical_cut("far_field_cut", "cut_coor", "frequencies",
                               f"{name}_farfield.cut",
+                              theta_start=-float(cut_theta_max_deg),
+                              theta_end=float(cut_theta_max_deg),
                               theta_np=cut_theta_np))
 
     # --- command sequence (verified against TICRA Tools 25 job) ---------

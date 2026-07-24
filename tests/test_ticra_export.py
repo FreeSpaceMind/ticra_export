@@ -348,6 +348,10 @@ def test_build_dual_reflector_project(tmp_path):
         tci_text.index("po_main get_currents") < \
         tci_text.index("far_field_cut get_field") < \
         tci_text.index("far_field_cut add_field")
+    # Far-field cut auto-sized to ~5 sidelobes at the lowest frequency
+    # (D = 10 m rim, 10 GHz -> 7*lambda/D = 1.2 deg half-range), 401 pts
+    assert "theta_range      : struct(start: -1.2, end: 1.2, np: 401)" \
+        in tor_text
     assert "get_field ( source : sequence(ref(po_main)))" in tci_text
     assert "add_field ( source : sequence(ref(po_sub)))" in tci_text
     assert "add_field ( source : sequence(ref(feed)))" in tci_text
