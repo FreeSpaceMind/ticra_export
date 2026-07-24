@@ -94,7 +94,8 @@ def build_dual_reflector_project(
         bors: Seq[tuple] = (),
         offset_parabolas: Seq[tuple] = (),
         mesh_tables: Seq[tuple] = (),
-        auto_convergence: bool = True) -> GraspProject:
+        auto_convergence: bool = True,
+        field_accuracy_db: float = -60.0) -> GraspProject:
     """Assemble the UAD first-case export: dual reflector, tabulated
     surfaces and feed, PO analysis of sub then main, spherical cut out.
 
@@ -145,10 +146,14 @@ def build_dual_reflector_project(
             quads).
         auto_convergence: When True (default), the get_currents
             commands request automatic convergence of the PO/PTD
-            expansion (``auto_convergence_of_po : on``) with the
-            convergence field checked on the next scatterer for the
-            subreflector and on the far-field cut for the main
-            reflector, so GRASP chooses the po_points itself.
+            expansion (``auto_convergence_of_po : on`` with
+            ``field_accuracy``): the subreflector currents converge on
+            the main reflector scatterer and the far-field cut, the
+            main currents on the far-field cut, so GRASP chooses the
+            po_points itself. Member layout verified against a TICRA
+            Tools 25 job (X5_long_horn .tci).
+        field_accuracy_db: Convergence accuracy for the automatic PO
+            convergence, in dB (default -60.0).
 
     Returns:
         A GraspProject ready for .write().
@@ -294,18 +299,24 @@ def build_dual_reflector_project(
     # for each remaining contribution (sub spillover and the direct
     # feed radiation).
     #
-    # With auto_convergence, each get_currents carries
-    # ``auto_convergence_of_po : on`` plus a convergence target -- the
-    # next scatterer for the sub, the output cut for the main --
-    # following the standard GRASP PO-wizard batch commands.
+    # With auto_convergence, each get_currents carries field_accuracy
+    # and ``auto_convergence_of_po : on``: the sub currents converge on
+    # the main reflector scatterer AND the output cut, the main
+    # currents on the output cut. Member names, order, and targets
+    # verified against a TICRA Tools 25 job (X5_long_horn .tci).
     sub_members = [("source", Sequence([Ref("feed")]))]
     main_members = [("source", Sequence([Ref("po_sub")]))]
     if auto_convergence:
         sub_members += [
+            ("field_accuracy", float(field_accuracy_db)),
             ("auto_convergence_of_po", True),
-            ("convergence_on_scatterer", Sequence([Ref("po_main")])),
+            ("convergence_on_scatterer",
+             Sequence([Ref("main_reflector")])),
+            ("convergence_on_output_grid",
+             Sequence([Ref("far_field_cut")])),
         ]
         main_members += [
+            ("field_accuracy", float(field_accuracy_db)),
             ("auto_convergence_of_po", True),
             ("convergence_on_output_grid",
              Sequence([Ref("far_field_cut")])),

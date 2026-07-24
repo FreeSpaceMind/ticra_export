@@ -351,12 +351,21 @@ def test_build_dual_reflector_project(tmp_path):
     assert "get_field ( source : sequence(ref(po_main)))" in tci_text
     assert "add_field ( source : sequence(ref(po_sub)))" in tci_text
     assert "add_field ( source : sequence(ref(feed)))" in tci_text
-    # Automatic PO convergence is requested by default, checked on the
-    # next scatterer for the sub and on the output cut for the main
+    # Automatic PO convergence by default -- member layout verbatim
+    # from a TICRA Tools 25 job (X5_long_horn .tci): field_accuracy,
+    # auto_convergence_of_po, then targets (sub: main reflector
+    # scatterer + output cut; main: output cut only)
     assert tci_text.count("auto_convergence_of_po : on") == 2
-    assert "convergence_on_scatterer : sequence(ref(po_main))" in tci_text
-    assert ("convergence_on_output_grid : sequence(ref(far_field_cut))"
+    assert tci_text.count("field_accuracy : -60.0") == 2
+    assert ("convergence_on_scatterer : sequence(ref(main_reflector))"
             in tci_text)
+    assert tci_text.count(
+        "convergence_on_output_grid : sequence(ref(far_field_cut))") == 2
+    sub_cmd = tci_text.split("po_main get_currents")[0]
+    assert sub_cmd.index("source") < sub_cmd.index("field_accuracy") \
+        < sub_cmd.index("auto_convergence_of_po") \
+        < sub_cmd.index("convergence_on_scatterer") \
+        < sub_cmd.index("convergence_on_output_grid")
 
 
 def test_reflector_holes_member():
