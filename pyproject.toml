@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ticra-export"
+version = "0.1.0"
+description = "Generate TICRA Tools / GRASP projects (.tor, .tci, .gxp) and convert parametric structure shapes to tabulated meshes"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+]
+
+[project.optional-dependencies]
+# Boolean (CSG) combination of closed-solid shapes
+boolean = ["manifold3d>=2.2.0"]
+# Accelerates self-proximity checks on large combined meshes
+fast = ["scipy"]
+full = ["manifold3d>=2.2.0", "scipy"]
+test = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
