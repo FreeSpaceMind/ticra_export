@@ -6,7 +6,7 @@ writers (.rim, .gxp), and a project assembler that builds a complete
 GRASP project directory from existing .cut and .sfc files.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from .tor import Comment, Quantity, Ref, Sequence, Struct, TorFile, TorObject
 from .tci import Command, TciFile
